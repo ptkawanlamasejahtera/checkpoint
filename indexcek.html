@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Checkpoint Armada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --asphalt:#1E2A33;
+    --steel:#3C4F5E;
+    --fog:#E7ECF0;
+    --card:#FFFFFF;
+    --line:#D3DBE1;
+    --amber:#E8A33D;
+    --amber-dark:#C6822A;
+    --ink:#17222B;
+    --muted:#6B7B87;
+    --danger:#C0463A;
+    --ok:#2E8B57;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--fog);
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+    -webkit-tap-highlight-color:transparent;
+    padding-bottom:110px;
+  }
+  /* HEADER */
+  .header{
+    background:linear-gradient(160deg,var(--asphalt) 0%, var(--steel) 100%);
+    padding:22px 20px 26px;
+    color:#fff;
+    position:relative;
+    overflow:hidden;
+  }
+  .stripe-band{
+    position:absolute; top:0; left:0; right:0; height:6px;
+    background:repeating-linear-gradient(135deg,var(--amber) 0 14px, var(--asphalt) 14px 28px);
+  }
+  .eyebrow{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:11px; letter-spacing:.18em; font-weight:600;
+    color:var(--amber); text-transform:uppercase; margin:10px 0 4px;
+  }
+  .title{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:26px; font-weight:700; margin:0 0 6px; letter-spacing:-0.01em;
+  }
+  .subtitle{
+    font-size:13px; color:#B9C6CE; font-family:'JetBrains Mono',monospace;
+  }
+
+  .wrap{ padding:16px 16px 0; max-width:520px; margin:0 auto; }
+
+  .section-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:12px; font-weight:600; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--steel); margin:22px 4px 8px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .section-title::before{
+    content:''; width:14px; height:2px; background:var(--amber); display:inline-block;
+  }
+
+  .card{
+    background:var(--card);
+    border-radius:14px;
+    border:1px solid var(--line);
+    padding:16px;
+    box-shadow:0 1px 2px rgba(23,34,43,0.04);
+  }
+  .card + .card{ margin-top:12px; }
+
+  .field{ margin-bottom:16px; }
+  .field:last-child{ margin-bottom:0; }
+  label{
+    display:block; font-size:12.5px; font-weight:600; color:var(--muted);
+    margin-bottom:7px;
+  }
+  label .req{ color:var(--amber-dark); }
+
+  input[type="text"], input[type="date"], input[type="time"]{
+    width:100%; padding:12px 13px; font-size:15px; font-family:'Inter',sans-serif;
+    border:1.5px solid var(--line); border-radius:10px; background:#fff; color:var(--ink);
+    outline:none;
+  }
+  input[type="text"]:focus, input[type="date"]:focus, input[type="time"]:focus{
+    border-color:var(--steel);
+  }
+  input[type="text"].upper{ text-transform:uppercase; letter-spacing:.03em; font-family:'JetBrains Mono',monospace; }
+
+  /* ID badge - ticket stub look */
+  .id-badge{
+    display:flex; align-items:center; justify-content:space-between;
+    border:1.5px dashed var(--line); border-radius:10px; padding:12px 14px;
+    background:repeating-linear-gradient(135deg, #FAFBFC 0 10px, #F4F6F8 10px 20px);
+  }
+  .id-badge .val{
+    font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; letter-spacing:.05em; color:var(--asphalt);
+  }
+  .id-badge .tag{
+    font-size:10px; font-weight:700; letter-spacing:.1em; color:#fff; background:var(--steel);
+    padding:3px 8px; border-radius:5px; text-transform:uppercase;
+  }
+
+  /* number stepper */
+  .stepper{
+    display:flex; align-items:center; border:1.5px solid var(--line); border-radius:10px; overflow:hidden;
+  }
+  .stepper button{
+    width:46px; height:46px; border:none; background:#F1F4F6; font-size:20px; color:var(--steel);
+    font-weight:700; cursor:pointer; flex-shrink:0;
+  }
+  .stepper button:active{ background:var(--line); }
+  .stepper input{
+    flex:1; border:none; text-align:center; font-family:'JetBrains Mono',monospace;
+    font-size:17px; font-weight:700; padding:12px 4px; outline:none; color:var(--ink); min-width:0;
+  }
+
+  /* toggle buttons */
+  .toggle-row{ display:flex; gap:10px; }
+  .toggle-btn{
+    flex:1; padding:13px 8px; text-align:center; border-radius:10px;
+    border:1.5px solid var(--line); background:#fff; font-weight:600; font-size:13.5px;
+    color:var(--muted); cursor:pointer; letter-spacing:.03em;
+  }
+  .toggle-btn.active{
+    border-color:var(--amber-dark); background:var(--amber); color:#fff;
+    box-shadow:0 2px 6px rgba(198,130,42,0.35);
+  }
+  .toggle-btn.active.neg{ background:var(--steel); border-color:var(--steel); color:#fff; box-shadow:none; }
+
+  /* photo box */
+  .photo-box{
+    position:relative; border:1.5px dashed var(--line); border-radius:10px;
+    height:120px; display:flex; align-items:center; justify-content:center;
+    background:#F8FAFB; overflow:hidden; cursor:pointer;
+  }
+  .photo-box.filled{ border-style:solid; border-color:var(--ok); }
+  .photo-box img{ width:100%; height:100%; object-fit:cover; }
+  .photo-box .placeholder{ color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; }
+  .photo-box input{ position:absolute; inset:0; opacity:0; cursor:pointer; }
+  .photo-box .badge-ok{
+    position:absolute; top:6px; right:6px; background:var(--ok); color:#fff;
+    font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px;
+  }
+
+  .time-row{ display:flex; gap:10px; }
+  .time-row .field{ flex:1; }
+
+  /* submit bar - barrier gate */
+  .submit-bar{
+    position:fixed; left:0; right:0; bottom:0; padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg, rgba(231,236,240,0) 0%, var(--fog) 30%);
+  }
+  #submit-btn{
+    width:100%; max-width:520px; margin:0 auto; display:flex; align-items:center; justify-content:center; gap:10px;
+    padding:16px; border:none; border-radius:12px; cursor:pointer;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px; letter-spacing:.04em;
+    color:#1A1400; text-transform:uppercase;
+    background:repeating-linear-gradient(135deg, var(--amber) 0 16px, var(--asphalt) 16px 32px);
+    background-size:200% 200%;
+    box-shadow:0 6px 16px rgba(30,42,51,0.28);
+    transition:transform .15s ease;
+  }
+  #submit-btn span.gate-text{ color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.3); }
+  #submit-btn:active{ transform:scale(0.98); }
+  #submit-btn:disabled{ opacity:0.75; cursor:default; }
+  .spinner{
+    width:16px; height:16px; border:2.5px solid rgba(255,255,255,0.4); border-top-color:#fff;
+    border-radius:50%; display:inline-block; animation:spin .7s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* toast */
+  #toast{
+    position:fixed; top:16px; left:50%; transform:translateX(-50%) translateY(-120%);
+    background:var(--ink); color:#fff; padding:12px 20px; border-radius:10px; font-size:14px; font-weight:600;
+    z-index:100; transition:transform .3s ease; box-shadow:0 8px 20px rgba(0,0,0,.25); max-width:88%; text-align:center;
+  }
+  #toast.show{ transform:translateX(-50%) translateY(0); }
+  #toast.error{ background:var(--danger); }
+  #toast.success{ background:var(--ok); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="stripe-band"></div>
+  <div class="eyebrow">Log Patroli · Pos Keamanan</div>
+  <div class="title">Checkpoint Armada</div>
+  <div class="subtitle" id="header-datetime">--</div>
+</div>
+
+<div class="wrap">
+
+  <div class="section-title">Identitas</div>
+  <div class="card">
+    <div class="field">
+      <label>ID Checkpoint</label>
+      <div class="id-badge">
+        <span class="val" id="id-value">------</span>
+        <span class="tag">Auto</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>Tanggal <span class="req">*</span></label>
+      <input type="date" id="tanggal" required>
+    </div>
+    <div class="field">
+      <label>Nopol <span class="req">*</span></label>
+      <input type="text" id="nopol" class="upper" placeholder="cth. B 1234 XYZ" oninput="this.value=this.value.toUpperCase()" required>
+    </div>
+  </div>
+
+  <div class="section-title">Odometer</div>
+  <div class="card">
+    <div class="field">
+      <label>KM Check Point <span class="req">*</span></label>
+      <div class="stepper">
+        <button type="button" onclick="stepKm(-1)">−</button>
+        <input type="text" inputmode="numeric" id="km" value="0">
+        <button type="button" onclick="stepKm(1)">+</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Foto KM <span class="req">*</span></label>
+      <div class="photo-box" id="box-km" onclick="document.getElementById('file-km').click()">
+        <div class="placeholder" id="ph-km">📷<span>Ambil foto odometer</span></div>
+        <img id="img-km" style="display:none">
+        <input type="file" id="file-km" accept="image/*" capture="environment" onchange="handlePhoto(this,'km')">
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">BBM</div>
+  <div class="card">
+    <div class="field">
+      <label>Status BBM <span class="req">*</span></label>
+      <div class="toggle-row">
+        <div class="toggle-btn" id="bbm-full" onclick="selectToggle('bbm','full')">FULL</div>
+        <div class="toggle-btn" id="bbm-tidak" onclick="selectToggle('bbm','tidak')">TIDAK FULL</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Foto BBM <span class="req">*</span></label>
+      <div class="photo-box" id="box-bbm" onclick="document.getElementById('file-bbm').click()">
+        <div class="placeholder" id="ph-bbm">📷<span>Ambil foto indikator BBM</span></div>
+        <img id="img-bbm" style="display:none">
+        <input type="file" id="file-bbm" accept="image/*" capture="environment" onchange="handlePhoto(this,'bbm')">
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Rekomendasi</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0;">
+      <label>Suggest <span class="req">*</span></label>
+      <div class="toggle-row">
+        <div class="toggle-btn" id="suggest-cuci" onclick="selectToggle('suggest','cuci')">CUCI</div>
+        <div class="toggle-btn" id="suggest-tidak" onclick="selectToggle('suggest','tidak')">TIDAK CUCI</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Waktu</div>
+  <div class="card">
+    <div class="time-row">
+      <div class="field">
+        <label>Start</label>
+        <input type="time" id="start">
+      </div>
+      <div class="field">
+        <label>Finish</label>
+        <input type="time" id="finish">
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="submit-bar">
+  <button id="submit-btn" onclick="submitForm()">
+    <span class="gate-text">✓ &nbsp;Simpan Checklist</span>
+  </button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  // ---- ID & date/time init ----
+  function genId(){
+    return Array.from({length:8}, () => "0123456789abcdef"[Math.floor(Math.random()*16)]).join('');
+  }
+  document.getElementById('id-value').textContent = genId();
+
+  function pad(n){ return n.toString().padStart(2,'0'); }
+  const now = new Date();
+  document.getElementById('tanggal').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  document.getElementById('header-datetime').textContent =
+    `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} · ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+  // ---- KM stepper ----
+  function stepKm(dir){
+    const el = document.getElementById('km');
+    let v = parseInt(el.value || '0', 10) + dir;
+    if (v < 0) v = 0;
+    el.value = v;
+  }
+  document.getElementById('km').addEventListener('input', function(){
+    this.value = this.value.replace(/[^0-9]/g,'');
+  });
+
+  // ---- toggles ----
+  const state = { bbm:null, suggest:null };
+  function selectToggle(group, value){
+    state[group] = value;
+    document.querySelectorAll(`.toggle-btn`).forEach(b=>{
+      if (b.id.startsWith(group+'-')) b.classList.remove('active','neg');
+    });
+    const idMap = {
+      bbm:{full:'bbm-full', tidak:'bbm-tidak'},
+      suggest:{cuci:'suggest-cuci', tidak:'suggest-tidak'}
+    };
+    const activeEl = document.getElementById(idMap[group][value]);
+    activeEl.classList.add('active');
+    if (value === 'tidak') activeEl.classList.add('neg');
+  }
+
+  // ---- photo capture + compression ----
+  const photos = {};
+  function compressImage(file, maxWidth, quality, callback){
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxWidth){ h = h * (maxWidth / w); w = maxWidth; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        callback(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  function handlePhoto(input, key){
+    const file = input.files[0];
+    if (!file) return;
+    compressImage(file, 700, 0.45, dataUrl => {
+      photos[key] = dataUrl;
+      const img = document.getElementById('img-'+key);
+      const ph = document.getElementById('ph-'+key);
+      const box = document.getElementById('box-'+key);
+      img.src = dataUrl;
+      img.style.display = 'block';
+      ph.style.display = 'none';
+      box.classList.add('filled');
+      if (!box.querySelector('.badge-ok')){
+        const badge = document.createElement('div');
+        badge.className = 'badge-ok';
+        badge.textContent = '✓';
+        box.appendChild(badge);
+      }
+    });
+  }
+
+  // ---- toast ----
+  function showToast(msg, type){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'show ' + (type || '');
+    setTimeout(()=>{ t.className = t.className.replace('show',''); }, 3200);
+  }
+
+  // ---- submit ----
+  async function submitForm(){
+    const tanggal = document.getElementById('tanggal').value;
+    const nopol = document.getElementById('nopol').value.trim();
+    const km = document.getElementById('km').value;
+    const start = document.getElementById('start').value;
+    const finish = document.getElementById('finish').value;
+    const id = document.getElementById('id-value').textContent;
+
+    if (!tanggal || !nopol){
+      showToast('Lengkapi Tanggal & Nopol dulu ya', 'error'); return;
+    }
+    if (!state.bbm){ showToast('Pilih status BBM dulu', 'error'); return; }
+    if (!state.suggest){ showToast('Pilih rekomendasi Suggest dulu', 'error'); return; }
+    if (!photos.km){ showToast('Foto KM wajib diisi', 'error'); return; }
+    if (!photos.bbm){ showToast('Foto BBM wajib diisi', 'error'); return; }
+
+    const scriptUrl = 'https://script.google.com/macros/s/AKfycbw6DiaVhu271xyOOIs6sFDxYPuZlOdCwXdNSOdb3awWpg4KywX9RKyPtvCdsG8GmiH0/exec';
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span><span class="gate-text">Menyimpan…</span>';
+
+    const payload = {
+      id, tanggal, nopol, km,
+      bbm: state.bbm === 'full' ? 'FULL' : 'TIDAK FULL',
+      suggest: state.suggest === 'cuci' ? 'CUCI' : 'TIDAK CUCI',
+      start, finish,
+      foto_km: photos.km,
+      foto_bbm: photos.bbm
+    };
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      await fetch(scriptUrl, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      showToast('✓ Checklist berhasil disimpan!', 'success');
+      setTimeout(() => location.reload(), 2000);
+    } catch (err) {
+      showToast(err.name === 'AbortError' ? 'Koneksi lambat/timeout. Coba lagi!' : 'Gagal menyimpan. Cek koneksi!', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="gate-text">✓ &nbsp;Simpan Checklist</span>';
+    }
+  }
+</script>
+
+</body>
+</html>
