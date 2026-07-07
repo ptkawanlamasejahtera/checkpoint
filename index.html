@@ -186,6 +186,23 @@
   #toast.show{ transform:translateX(-50%) translateY(0); }
   #toast.error{ background:var(--danger); }
   #toast.success{ background:var(--ok); }
+
+  /* failed-submission banner */
+  #fail-banner{
+    max-width:520px; margin:0 auto; padding:0 16px;
+  }
+  .fail-card{
+    background:#FDECEA; border:1.5px solid var(--danger); border-radius:12px;
+    padding:12px 14px; margin-top:12px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+  }
+  .fail-card .info{ font-size:12.5px; color:var(--danger); line-height:1.4; }
+  .fail-card .info b{ display:block; font-family:'JetBrains Mono',monospace; font-size:13px; }
+  .fail-card button{
+    flex-shrink:0; border:none; background:var(--danger); color:#fff; font-weight:700;
+    font-size:12.5px; padding:9px 13px; border-radius:8px; cursor:pointer;
+  }
+  .fail-card button:disabled{ opacity:.6; }
 </style>
 </head>
 <body>
@@ -196,6 +213,8 @@
   <div class="title">Checkpoint Armada</div>
   <div class="subtitle" id="header-datetime">--</div>
 </div>
+
+<div id="fail-banner"></div>
 
 <div class="wrap">
 
@@ -379,8 +398,11 @@
     setTimeout(()=>{ t.className = t.className.replace('show',''); }, 3200);
   }
 
-  // ---- submit ----
-  async function submitForm(){
+  // ---- submit (optimistic: instant "saved" feedback, send happens in background) ----
+  const scriptUrl = 'https://script.google.com/macros/s/AKfycbw6DiaVhu271xyOOIs6sFDxYPuZlOdCwXdNSOdb3awWpg4KywX9RKyPtvCdsG8GmiH0/exec';
+  const failedItems = {}; // key -> { payload, label }
+
+  function submitForm(){
     const tanggal = document.getElementById('tanggal').value;
     const nopol = document.getElementById('nopol').value.trim();
     const km = document.getElementById('km').value;
@@ -396,12 +418,6 @@
     if (!photos.km){ showToast('Foto KM wajib diisi', 'error'); return; }
     if (!photos.bbm){ showToast('Foto BBM wajib diisi', 'error'); return; }
 
-    const scriptUrl = 'https://script.google.com/macros/s/AKfycbw6DiaVhu271xyOOIs6sFDxYPuZlOdCwXdNSOdb3awWpg4KywX9RKyPtvCdsG8GmiH0/exec';
-
-    const btn = document.getElementById('submit-btn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span><span class="gate-text">Menyimpan…</span>';
-
     const payload = {
       id, tanggal, nopol, km,
       bbm: state.bbm === 'full' ? 'FULL' : 'TIDAK FULL',
@@ -411,24 +427,98 @@
       foto_bbm: photos.bbm
     };
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
-      await fetch(scriptUrl, {
-        method: 'POST', mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: controller.signal
-      });
+    // brief lock just to prevent accidental double-tap, not to wait on network
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    setTimeout(() => { btn.disabled = false; }, 600);
+
+    showToast('✓ Tersimpan — ' + nopol, 'success');
+    resetFormForNext();
+
+    sendInBackground(payload, id + '-' + Date.now());
+  }
+
+  function sendInBackground(payload, key){
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    fetch(scriptUrl, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    }).then(() => {
       clearTimeout(timeoutId);
-      showToast('✓ Checklist berhasil disimpan!', 'success');
-      setTimeout(() => location.reload(), 2000);
-    } catch (err) {
-      showToast(err.name === 'AbortError' ? 'Koneksi lambat/timeout. Coba lagi!' : 'Gagal menyimpan. Cek koneksi!', 'error');
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = '<span class="gate-text">✓ &nbsp;Simpan Checklist</span>';
-    }
+      // no-cors gives no readable status, but a resolved promise means the
+      // request actually reached the network layer without erroring out.
+    }).catch(err => {
+      clearTimeout(timeoutId);
+      failedItems[key] = { payload, label: payload.nopol + ' · ' + payload.tanggal + (payload.km ? ' · ' + payload.km + ' km' : '') };
+      renderFailBanner();
+      showToast('⚠ Gagal kirim data ' + payload.nopol + ' — cek pita merah di atas', 'error');
+    });
+  }
+
+  function renderFailBanner(){
+    const el = document.getElementById('fail-banner');
+    const keys = Object.keys(failedItems);
+    if (keys.length === 0){ el.innerHTML = ''; return; }
+    el.innerHTML = keys.map(key => `
+      <div class="fail-card">
+        <div class="info">Gagal terkirim<b>${failedItems[key].label}</b></div>
+        <button onclick="retryItem('${key}')">Kirim Ulang</button>
+      </div>
+    `).join('');
+  }
+
+  function retryItem(key){
+    const item = failedItems[key];
+    if (!item) return;
+    const btns = document.querySelectorAll('#fail-banner button');
+    btns.forEach(b => b.disabled = true);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    fetch(scriptUrl, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item.payload),
+      signal: controller.signal
+    }).then(() => {
+      clearTimeout(timeoutId);
+      delete failedItems[key];
+      renderFailBanner();
+      showToast('✓ Berhasil dikirim ulang — ' + item.label, 'success');
+    }).catch(() => {
+      clearTimeout(timeoutId);
+      showToast('Masih gagal. Cek koneksi lalu coba lagi.', 'error');
+      renderFailBanner();
+    });
+  }
+
+  // ---- reset fields for the next vehicle in line ----
+  function resetFormForNext(){
+    document.getElementById('id-value').textContent = genId();
+    document.getElementById('nopol').value = '';
+    document.getElementById('km').value = '0';
+    document.getElementById('start').value = '';
+    document.getElementById('finish').value = '';
+
+    state.bbm = null; state.suggest = null;
+    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active', 'neg'));
+
+    ['km','bbm'].forEach(k => {
+      delete photos[k];
+      const img = document.getElementById('img-'+k);
+      const ph = document.getElementById('ph-'+k);
+      const box = document.getElementById('box-'+k);
+      img.style.display = 'none';
+      img.src = '';
+      ph.style.display = 'flex';
+      box.classList.remove('filled');
+      const badge = box.querySelector('.badge-ok');
+      if (badge) badge.remove();
+      document.getElementById('file-'+k).value = '';
+    });
   }
 </script>
 
