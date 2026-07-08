@@ -167,6 +167,12 @@
     width:38px; height:38px; border-radius:50%; border:none; background:rgba(0,0,0,.45); color:#fff;
     font-size:18px; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer;
   }
+  .cam-flash{
+    position:absolute; top:calc(14px + env(safe-area-inset-top)); right:14px; z-index:2;
+    width:38px; height:38px; border-radius:50%; border:none; background:rgba(0,0,0,.45); color:#fff;
+    font-size:17px; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .cam-flash.on{ background:var(--amber); color:#1A1400; box-shadow:0 0 0 3px rgba(232,163,61,0.35); }
   .camera-controls{
     position:absolute; bottom:0; left:0; right:0; z-index:2;
     padding:26px 20px calc(26px + env(safe-area-inset-bottom));
@@ -381,6 +387,7 @@
 <div class="camera-modal" id="camera-modal">
   <div class="cam-hint" id="cam-hint">Ambil Foto</div>
   <button class="cam-close" onclick="closeCamera()">✕</button>
+  <button class="cam-flash" id="cam-flash" onclick="toggleTorch()" style="display:none;">⚡</button>
   <video id="camera-video" autoplay playsinline muted></video>
   <canvas id="camera-canvas" style="display:none;"></canvas>
   <div class="camera-controls">
@@ -597,6 +604,7 @@
         // autoplay attribute present.
         const playPromise = video.play();
         if (playPromise && playPromise.catch) playPromise.catch(() => {});
+        setupTorchButton(stream);
       })
       .catch(() => {
         // Permission denied, no camera, or the request just never responded
@@ -612,11 +620,48 @@
     };
   }
 
+  // ---- flash / torch ----
+  let torchOn = false;
+
+  function setupTorchButton(stream){
+    const flashBtn = document.getElementById('cam-flash');
+    const track = stream.getVideoTracks()[0];
+    const caps = track && track.getCapabilities ? track.getCapabilities() : {};
+    if (caps && caps.torch){
+      flashBtn.style.display = 'flex';
+      flashBtn.classList.remove('on');
+    } else {
+      // Torch not supported on this camera/device/browser — hide the button
+      // rather than showing something that won't do anything.
+      flashBtn.style.display = 'none';
+    }
+    torchOn = false;
+  }
+
+  function toggleTorch(){
+    if (!cameraStream) return;
+    const track = cameraStream.getVideoTracks()[0];
+    if (!track || !track.getCapabilities || !track.getCapabilities().torch) return;
+    const next = !torchOn;
+    track.applyConstraints({ advanced: [{ torch: next }] })
+      .then(() => {
+        torchOn = next;
+        document.getElementById('cam-flash').classList.toggle('on', torchOn);
+      })
+      .catch(() => {
+        showToast('HP ini tidak mendukung flash kamera', 'error');
+      });
+  }
+
   function closeCamera(){
     const modal = document.getElementById('camera-modal');
     const video = document.getElementById('camera-video');
+    const flashBtn = document.getElementById('cam-flash');
     modal.classList.remove('show');
     document.getElementById('cam-status').classList.remove('show');
+    flashBtn.style.display = 'none';
+    flashBtn.classList.remove('on');
+    torchOn = false;
     if (cameraStream){
       cameraStream.getTracks().forEach(t => t.stop());
       cameraStream = null;
