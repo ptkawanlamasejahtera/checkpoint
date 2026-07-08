@@ -203,6 +203,27 @@
     font-size:12.5px; padding:9px 13px; border-radius:8px; cursor:pointer;
   }
   .fail-card button:disabled{ opacity:.6; }
+
+  /* nopol autocomplete */
+  .suggest-list{
+    position:absolute; left:0; right:0; top:100%; margin-top:4px;
+    background:#fff; border:1.5px solid var(--line); border-radius:10px;
+    max-height:230px; overflow-y:auto; z-index:20;
+    box-shadow:0 10px 24px rgba(23,34,43,0.14);
+    display:none;
+  }
+  .suggest-list.show{ display:block; }
+  .suggest-item{ padding:10px 13px; cursor:pointer; border-bottom:1px solid var(--line); }
+  .suggest-item:last-child{ border-bottom:none; }
+  .suggest-item:active{ background:#F1F4F6; }
+  .suggest-item .s-nopol{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:14px; color:var(--ink); }
+  .suggest-item .s-meta{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .suggest-empty{ padding:12px 13px; font-size:12px; color:var(--muted); }
+
+  .armada-chips{ display:flex; gap:8px; }
+  .chip{ flex:1; background:#F1F4F6; border-radius:9px; padding:8px 10px; text-align:center; min-width:0; }
+  .chip-label{ display:block; font-size:9.5px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; font-weight:700; margin-bottom:2px; }
+  .chip-val{ display:block; font-family:'JetBrains Mono',monospace; font-size:12.5px; font-weight:700; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -231,9 +252,18 @@
       <label>Tanggal <span class="req">*</span></label>
       <input type="date" id="tanggal" required>
     </div>
-    <div class="field">
+    <div class="field" style="position:relative;">
       <label>Nopol <span class="req">*</span></label>
-      <input type="text" id="nopol" class="upper" placeholder="cth. B 1234 XYZ" oninput="this.value=this.value.toUpperCase()" required>
+      <input type="text" id="nopol" class="upper" placeholder="Ketik nopol… cth. A8373WX" autocomplete="off" required>
+      <div id="nopol-suggest" class="suggest-list"></div>
+    </div>
+    <div class="field" id="armada-info" style="display:none; margin-bottom:0;">
+      <label>Info Armada</label>
+      <div class="armada-chips">
+        <div class="chip"><span class="chip-label">Kode</span><span class="chip-val" id="info-kode">-</span></div>
+        <div class="chip"><span class="chip-label">Type</span><span class="chip-val" id="info-type">-</span></div>
+        <div class="chip"><span class="chip-label">BU</span><span class="chip-val" id="info-bu">-</span></div>
+      </div>
     </div>
   </div>
 
@@ -312,6 +342,8 @@
 <div id="toast"></div>
 
 <script>
+  const scriptUrl = 'https://script.google.com/macros/s/AKfycbw6DiaVhu271xyOOIs6sFDxYPuZlOdCwXdNSOdb3awWpg4KywX9RKyPtvCdsG8GmiH0/exec';
+
   // ---- ID & date/time init ----
   function genId(){
     return Array.from({length:8}, () => "0123456789abcdef"[Math.floor(Math.random()*16)]).join('');
@@ -334,6 +366,79 @@
   document.getElementById('km').addEventListener('input', function(){
     this.value = this.value.replace(/[^0-9]/g,'');
   });
+
+  // ---- master armada: autocomplete nopol -> kode/type/bu ----
+  let masterArmada = [];
+  let selectedArmada = null;
+  const nopolInput = document.getElementById('nopol');
+  const suggestBox = document.getElementById('nopol-suggest');
+  const armadaInfoBox = document.getElementById('armada-info');
+
+  async function loadMasterArmada(){
+    try {
+      const res = await fetch(scriptUrl + '?action=master');
+      const data = await res.json();
+      if (Array.isArray(data)) masterArmada = data;
+    } catch (err) {
+      // offline or blocked — form still works, just falls back to manual nopol entry
+      console.warn('Gagal memuat master armada:', err);
+    }
+  }
+  loadMasterArmada();
+
+  function renderSuggestions(query){
+    if (!query){ suggestBox.classList.remove('show'); return; }
+    if (masterArmada.length === 0){
+      suggestBox.innerHTML = '<div class="suggest-empty">Master armada belum termuat — bisa lanjut ketik manual</div>';
+      suggestBox.classList.add('show');
+      return;
+    }
+    const matches = masterArmada.filter(m => m.nopol.includes(query)).slice(0, 6);
+    if (matches.length === 0){
+      suggestBox.innerHTML = '<div class="suggest-empty">Nopol tidak ada di master — lanjut input manual</div>';
+    } else {
+      suggestBox.innerHTML = matches.map(m => `
+        <div class="suggest-item" onmousedown="selectArmada('${m.nopol}')">
+          <div class="s-nopol">${m.nopol}</div>
+          <div class="s-meta">${m.kode || '-'} · ${m.type || '-'} · ${m.bu || '-'}</div>
+        </div>
+      `).join('');
+    }
+    suggestBox.classList.add('show');
+  }
+
+  nopolInput.addEventListener('input', function(){
+    this.value = this.value.toUpperCase();
+    selectedArmada = null;
+    armadaInfoBox.style.display = 'none';
+    renderSuggestions(this.value.trim());
+  });
+  nopolInput.addEventListener('focus', function(){
+    if (this.value.trim()) renderSuggestions(this.value.trim());
+  });
+  nopolInput.addEventListener('blur', function(){
+    setTimeout(() => {
+      suggestBox.classList.remove('show');
+      if (this.value.trim() && !selectedArmada){
+        document.getElementById('info-kode').textContent = '-';
+        document.getElementById('info-type').textContent = '-';
+        document.getElementById('info-bu').textContent = '-';
+        armadaInfoBox.style.display = 'block';
+      }
+    }, 150);
+  });
+
+  function selectArmada(nopolVal){
+    const item = masterArmada.find(m => m.nopol === nopolVal);
+    if (!item) return;
+    nopolInput.value = item.nopol;
+    selectedArmada = item;
+    document.getElementById('info-kode').textContent = item.kode || '-';
+    document.getElementById('info-type').textContent = item.type || '-';
+    document.getElementById('info-bu').textContent = item.bu || '-';
+    armadaInfoBox.style.display = 'block';
+    suggestBox.classList.remove('show');
+  }
 
   // ---- toggles ----
   const state = { bbm:null, suggest:null };
@@ -399,7 +504,6 @@
   }
 
   // ---- submit (optimistic: instant "saved" feedback, send happens in background) ----
-  const scriptUrl = 'https://script.google.com/macros/s/AKfycbw6DiaVhu271xyOOIs6sFDxYPuZlOdCwXdNSOdb3awWpg4KywX9RKyPtvCdsG8GmiH0/exec';
   const failedItems = {}; // key -> { payload, label }
 
   function submitForm(){
@@ -420,6 +524,9 @@
 
     const payload = {
       id, tanggal, nopol, km,
+      kode_armada: selectedArmada ? selectedArmada.kode : '-',
+      type_armada: selectedArmada ? selectedArmada.type : '-',
+      bu: selectedArmada ? selectedArmada.bu : '-',
       bbm: state.bbm === 'full' ? 'FULL' : 'TIDAK FULL',
       suggest: state.suggest === 'cuci' ? 'CUCI' : 'TIDAK CUCI',
       start, finish,
@@ -502,6 +609,10 @@
     document.getElementById('km').value = '0';
     document.getElementById('start').value = '';
     document.getElementById('finish').value = '';
+
+    selectedArmada = null;
+    document.getElementById('armada-info').style.display = 'none';
+    document.getElementById('nopol-suggest').classList.remove('show');
 
     state.bbm = null; state.suggest = null;
     document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active', 'neg'));
