@@ -144,11 +144,48 @@
   .photo-box.filled{ border-style:solid; border-color:var(--ok); }
   .photo-box img{ width:100%; height:100%; object-fit:cover; }
   .photo-box .placeholder{ color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; }
-  .photo-box input{ position:absolute; inset:0; opacity:0; cursor:pointer; }
+  .photo-box input{ display:none; }
   .photo-box .badge-ok{
     position:absolute; top:6px; right:6px; background:var(--ok); color:#fff;
     font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px;
   }
+
+  /* in-page camera (avoids launching the OS camera app, which can get the
+     tab reloaded/killed in the background on low-RAM phones and lose the photo) */
+  .camera-modal{
+    position:fixed; inset:0; background:#000; z-index:200; display:none;
+    align-items:center; justify-content:center;
+  }
+  .camera-modal.show{ display:flex; }
+  .camera-modal video{ width:100%; height:100%; object-fit:cover; }
+  .cam-hint{
+    position:absolute; top:calc(16px + env(safe-area-inset-top)); left:0; right:0; text-align:center;
+    color:#fff; font-size:13px; font-weight:600; letter-spacing:.03em; text-shadow:0 1px 3px rgba(0,0,0,.6); z-index:2;
+  }
+  .cam-close{
+    position:absolute; top:calc(14px + env(safe-area-inset-top)); left:14px; z-index:2;
+    width:38px; height:38px; border-radius:50%; border:none; background:rgba(0,0,0,.45); color:#fff;
+    font-size:18px; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .camera-controls{
+    position:absolute; bottom:0; left:0; right:0; z-index:2;
+    padding:26px 20px calc(26px + env(safe-area-inset-bottom));
+    display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(0deg, rgba(0,0,0,.6), rgba(0,0,0,0));
+  }
+  .cam-shutter{
+    width:70px; height:70px; border-radius:50%; border:4px solid #fff; background:rgba(255,255,255,.15);
+    cursor:pointer; position:relative; padding:0;
+  }
+  .cam-shutter::after{
+    content:''; position:absolute; inset:6px; border-radius:50%; background:#fff;
+  }
+  .cam-status{
+    position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    flex-direction:column; gap:10px; color:#fff; font-size:13px; text-align:center; padding:0 30px; z-index:3;
+    background:rgba(0,0,0,.55);
+  }
+  .cam-status.show{ display:flex; }
 
   .time-row{ display:flex; gap:10px; }
   .time-row .field{ flex:1; }
@@ -279,7 +316,7 @@
     </div>
     <div class="field">
       <label>Foto KM <span class="req">*</span></label>
-      <div class="photo-box" id="box-km" onclick="document.getElementById('file-km').click()">
+      <div class="photo-box" id="box-km" onclick="openCamera('km','Foto KM Odometer')">
         <div class="placeholder" id="ph-km">📷<span>Ambil foto odometer</span></div>
         <img id="img-km" style="display:none">
         <input type="file" id="file-km" accept="image/*" capture="environment" onchange="handlePhoto(this,'km')">
@@ -298,7 +335,7 @@
     </div>
     <div class="field">
       <label>Foto BBM <span class="req">*</span></label>
-      <div class="photo-box" id="box-bbm" onclick="document.getElementById('file-bbm').click()">
+      <div class="photo-box" id="box-bbm" onclick="openCamera('bbm','Foto Indikator BBM')">
         <div class="placeholder" id="ph-bbm">📷<span>Ambil foto indikator BBM</span></div>
         <img id="img-bbm" style="display:none">
         <input type="file" id="file-bbm" accept="image/*" capture="environment" onchange="handlePhoto(this,'bbm')">
@@ -340,6 +377,20 @@
 </div>
 
 <div id="toast"></div>
+
+<div class="camera-modal" id="camera-modal">
+  <div class="cam-hint" id="cam-hint">Ambil Foto</div>
+  <button class="cam-close" onclick="closeCamera()">✕</button>
+  <video id="camera-video" autoplay playsinline muted></video>
+  <canvas id="camera-canvas" style="display:none;"></canvas>
+  <div class="camera-controls">
+    <button class="cam-shutter" onclick="captureShot()"></button>
+  </div>
+  <div class="cam-status" id="cam-status">
+    <span>📷</span>
+    <span id="cam-status-text">Membuka kamera…</span>
+  </div>
+</div>
 
 <script>
   const scriptUrl = 'https://script.google.com/macros/s/AKfycbw6DiaVhu271xyOOIs6sFDxYPuZlOdCwXdNSOdb3awWpg4KywX9RKyPtvCdsG8GmiH0/exec';
@@ -458,6 +509,24 @@
 
   // ---- photo capture + compression ----
   const photos = {};
+
+  function applyPhoto(key, dataUrl){
+    photos[key] = dataUrl;
+    const img = document.getElementById('img-'+key);
+    const ph = document.getElementById('ph-'+key);
+    const box = document.getElementById('box-'+key);
+    img.src = dataUrl;
+    img.style.display = 'block';
+    ph.style.display = 'none';
+    box.classList.add('filled');
+    if (!box.querySelector('.badge-ok')){
+      const badge = document.createElement('div');
+      badge.className = 'badge-ok';
+      badge.textContent = '✓';
+      box.appendChild(badge);
+    }
+  }
+
   function compressImage(file, maxWidth, quality, callback){
     const reader = new FileReader();
     reader.onload = e => {
@@ -474,25 +543,119 @@
     };
     reader.readAsDataURL(file);
   }
+
+  // Fallback path only (used if in-page camera can't start, e.g. permission
+  // denied or unsupported browser) — this is the OLD flow that hands off to
+  // the OS camera app, which is what caused photos to disappear before.
   function handlePhoto(input, key){
     const file = input.files[0];
     if (!file) return;
-    compressImage(file, 700, 0.45, dataUrl => {
-      photos[key] = dataUrl;
-      const img = document.getElementById('img-'+key);
-      const ph = document.getElementById('ph-'+key);
-      const box = document.getElementById('box-'+key);
-      img.src = dataUrl;
-      img.style.display = 'block';
-      ph.style.display = 'none';
-      box.classList.add('filled');
-      if (!box.querySelector('.badge-ok')){
-        const badge = document.createElement('div');
-        badge.className = 'badge-ok';
-        badge.textContent = '✓';
-        box.appendChild(badge);
-      }
-    });
+    compressImage(file, 700, 0.45, dataUrl => applyPhoto(key, dataUrl));
+  }
+
+  // ---- in-page live camera (default path) ----
+  // Captures the photo without ever leaving the page, so the browser tab
+  // never gets backgrounded/reloaded and the shot can't get lost.
+  let cameraStream = null;
+  let currentCameraKey = null;
+  let cameraReady = false;
+
+  function openCamera(key, label){
+    currentCameraKey = key;
+    cameraReady = false;
+    document.getElementById('cam-hint').textContent = label || 'Ambil Foto';
+    const modal = document.getElementById('camera-modal');
+    const status = document.getElementById('cam-status');
+    const statusText = document.getElementById('cam-status-text');
+    const video = document.getElementById('camera-video');
+    modal.classList.add('show');
+    status.classList.add('show');
+    statusText.textContent = 'Membuka kamera…';
+
+    // In-page camera only works on a secure origin (https, or localhost).
+    // If the page was opened from a file/content URI — e.g. tapped straight
+    // from a WhatsApp attachment — the browser blocks getUserMedia entirely
+    // and the request never even settles. Skip straight to the OS camera
+    // fallback in that case instead of hanging on "Membuka kamera…".
+    const secure = window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+    if (!secure){
+      closeCamera();
+      document.getElementById('file-'+key).click();
+      return;
+    }
+
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000));
+
+    Promise.race([
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }),
+      timeout
+    ])
+      .then(stream => {
+        cameraStream = stream;
+        video.srcObject = stream;
+        // Some Android browsers need play() called explicitly even with the
+        // autoplay attribute present.
+        const playPromise = video.play();
+        if (playPromise && playPromise.catch) playPromise.catch(() => {});
+      })
+      .catch(() => {
+        // Permission denied, no camera, or the request just never responded
+        // (e.g. insecure origin) — fall back to the OS camera app so the
+        // user is never stuck.
+        closeCamera();
+        document.getElementById('file-'+key).click();
+      });
+
+    video.onloadedmetadata = () => {
+      cameraReady = true;
+      status.classList.remove('show');
+    };
+  }
+
+  function closeCamera(){
+    const modal = document.getElementById('camera-modal');
+    const video = document.getElementById('camera-video');
+    modal.classList.remove('show');
+    document.getElementById('cam-status').classList.remove('show');
+    if (cameraStream){
+      cameraStream.getTracks().forEach(t => t.stop());
+      cameraStream = null;
+    }
+    video.onloadedmetadata = null;
+    video.srcObject = null;
+    currentCameraKey = null;
+    cameraReady = false;
+  }
+
+  function captureShot(){
+    if (!currentCameraKey || !cameraStream) return;
+
+    const video = document.getElementById('camera-video');
+    // Guard against tapping the shutter before the stream has any frames yet
+    // (readyState < 2 means drawImage would throw and, without this check,
+    // leave the camera screen stuck with no photo and no way back).
+    if (!cameraReady || video.readyState < 2){
+      showToast('Kamera masih memuat, coba tunggu sebentar…', 'error');
+      return;
+    }
+
+    const key = currentCameraKey;
+    try {
+      const canvas = document.getElementById('camera-canvas');
+      const maxWidth = 700;
+      let w = video.videoWidth || 700, h = video.videoHeight || 700;
+      if (w > maxWidth){ h = h * (maxWidth / w); w = maxWidth; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.45);
+      applyPhoto(key, dataUrl);
+      closeCamera();
+    } catch (err) {
+      // Never leave the user stuck on the camera screen — close it and let
+      // them retry (or fall back to the OS camera) instead.
+      closeCamera();
+      showToast('Gagal mengambil foto, coba lagi ya', 'error');
+    }
   }
 
   // ---- toast ----
