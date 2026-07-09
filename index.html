@@ -387,7 +387,7 @@
 <div class="camera-modal" id="camera-modal">
   <div class="cam-hint" id="cam-hint">Ambil Foto</div>
   <button class="cam-close" onclick="closeCamera()">✕</button>
-  <button class="cam-flash" id="cam-flash" onclick="toggleTorch()" style="display:none;">⚡</button>
+  <button class="cam-flash" id="cam-flash" onclick="toggleTorch()">⚡</button>
   <video id="camera-video" autoplay playsinline muted></video>
   <canvas id="camera-canvas" style="display:none;"></canvas>
   <div class="camera-controls">
@@ -624,24 +624,29 @@
   let torchOn = false;
 
   function setupTorchButton(stream){
-    const flashBtn = document.getElementById('cam-flash');
-    const track = stream.getVideoTracks()[0];
-    const caps = track && track.getCapabilities ? track.getCapabilities() : {};
-    if (caps && caps.torch){
-      flashBtn.style.display = 'flex';
-      flashBtn.classList.remove('on');
-    } else {
-      // Torch not supported on this camera/device/browser — hide the button
-      // rather than showing something that won't do anything.
-      flashBtn.style.display = 'none';
-    }
+    // Always keep the button visible — capability checks right after the
+    // stream starts are unreliable on some Android devices (torch briefly
+    // reports as unsupported until autofocus/exposure settles). We check
+    // support for real at tap time in toggleTorch() instead of hiding here.
+    document.getElementById('cam-flash').classList.remove('on');
     torchOn = false;
   }
 
   function toggleTorch(){
-    if (!cameraStream) return;
+    if (!cameraStream){
+      showToast('Kamera belum siap', 'error');
+      return;
+    }
     const track = cameraStream.getVideoTracks()[0];
-    if (!track || !track.getCapabilities || !track.getCapabilities().torch) return;
+    if (!track){
+      showToast('Kamera belum siap', 'error');
+      return;
+    }
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    if (!caps || !caps.torch){
+      showToast('Flash tidak didukung di HP/browser ini', 'error');
+      return;
+    }
     const next = !torchOn;
     track.applyConstraints({ advanced: [{ torch: next }] })
       .then(() => {
@@ -649,7 +654,7 @@
         document.getElementById('cam-flash').classList.toggle('on', torchOn);
       })
       .catch(() => {
-        showToast('HP ini tidak mendukung flash kamera', 'error');
+        showToast('Gagal menyalakan flash — coba lagi', 'error');
       });
   }
 
@@ -659,7 +664,6 @@
     const flashBtn = document.getElementById('cam-flash');
     modal.classList.remove('show');
     document.getElementById('cam-status').classList.remove('show');
-    flashBtn.style.display = 'none';
     flashBtn.classList.remove('on');
     torchOn = false;
     if (cameraStream){
