@@ -84,15 +84,16 @@
   }
   label .req{ color:var(--amber-dark); }
 
-  input[type="text"], input[type="date"], input[type="time"]{
+  input[type="text"], input[type="date"], input[type="time"], textarea{
     width:100%; padding:12px 13px; font-size:15px; font-family:'Inter',sans-serif;
     border:1.5px solid var(--line); border-radius:10px; background:#fff; color:var(--ink);
     outline:none;
   }
-  input[type="text"]:focus, input[type="date"]:focus, input[type="time"]:focus{
+  input[type="text"]:focus, input[type="date"]:focus, input[type="time"]:focus, textarea:focus{
     border-color:var(--steel);
   }
   input[type="text"].upper{ text-transform:uppercase; letter-spacing:.03em; font-family:'JetBrains Mono',monospace; }
+  textarea{ resize:vertical; font-family:'Inter',sans-serif; line-height:1.5; }
 
   /* ID badge - ticket stub look */
   .id-badge{
@@ -371,6 +372,14 @@
         <label>Finish</label>
         <input type="time" id="finish">
       </div>
+    </div>
+  </div>
+
+  <div class="section-title">Catatan</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0;">
+      <label>Keterangan</label>
+      <textarea id="keterangan" rows="3" placeholder="Catatan tambahan (opsional)..."></textarea>
     </div>
   </div>
 
@@ -724,6 +733,7 @@
     const km = document.getElementById('km').value;
     const start = document.getElementById('start').value;
     const finish = document.getElementById('finish').value;
+    const keterangan = document.getElementById('keterangan').value.trim();
     const id = document.getElementById('id-value').textContent;
 
     if (!tanggal || !nopol){
@@ -741,7 +751,7 @@
       bu: selectedArmada ? selectedArmada.bu : '-',
       bbm: state.bbm === 'full' ? 'FULL' : 'TIDAK FULL',
       suggest: state.suggest === 'cuci' ? 'CUCI' : 'TIDAK CUCI',
-      start, finish,
+      start, finish, keterangan,
       foto_km: photos.km,
       foto_bbm: photos.bbm
     };
@@ -821,6 +831,7 @@
     document.getElementById('km').value = '0';
     document.getElementById('start').value = '';
     document.getElementById('finish').value = '';
+    document.getElementById('keterangan').value = '';
 
     selectedArmada = null;
     document.getElementById('armada-info').style.display = 'none';
