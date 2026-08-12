@@ -441,15 +441,35 @@
   const suggestBox = document.getElementById('nopol-suggest');
   const armadaInfoBox = document.getElementById('armada-info');
 
-  async function loadMasterArmada(){
-    try {
-      const res = await fetch(scriptUrl + '?action=master');
-      const data = await res.json();
-      if (Array.isArray(data)) masterArmada = data;
-    } catch (err) {
-      // offline or blocked — form still works, just falls back to manual nopol entry
-      console.warn('Gagal memuat master armada:', err);
+  function loadMasterArmada(){
+    // Apps Script doesn't send CORS headers, so a plain fetch() GET from a
+    // different origin (GitHub Pages) can't read the response — it fails
+    // silently and masterArmada stays empty forever. JSONP (loading a
+    // <script> tag) isn't subject to CORS, so use that instead.
+    const cbName = 'masterArmadaCb_' + Date.now();
+    let settled = false;
+
+    function cleanup(script){
+      if (script && script.parentNode) script.parentNode.removeChild(script);
+      delete window[cbName];
     }
+
+    window[cbName] = function(data){
+      settled = true;
+      if (Array.isArray(data)) masterArmada = data;
+      cleanup(script);
+    };
+
+    const script = document.createElement('script');
+    script.src = scriptUrl + '?action=master&callback=' + cbName;
+    script.onerror = () => {
+      if (!settled) { console.warn('Gagal memuat master armada (network)'); cleanup(script); }
+    };
+    document.head.appendChild(script);
+
+    // Safety timeout — if the script never loads/calls back, don't leave a
+    // dangling global around forever.
+    setTimeout(() => { if (!settled) cleanup(script); }, 8000);
   }
   loadMasterArmada();
 
