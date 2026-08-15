@@ -660,7 +660,18 @@
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000));
 
     Promise.race([
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }),
+      navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          // Phone rear cameras often default to very high native resolution
+          // (e.g. 4000px+) if unconstrained, which is heavy to stream/process
+          // and can make the page feel frozen. Cap it — plenty sharp enough
+          // for reading an odometer/gauge, much lighter on mid-range phones.
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      }),
       timeout
     ])
       .then(stream => {
@@ -755,22 +766,34 @@
     }
 
     const key = currentCameraKey;
-    try {
-      const canvas = document.getElementById('camera-canvas');
-      const maxWidth = 700;
-      let w = video.videoWidth || 700, h = video.videoHeight || 700;
-      if (w > maxWidth){ h = h * (maxWidth / w); w = maxWidth; }
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(video, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.45);
-      applyPhoto(key, dataUrl);
-      closeCamera();
-    } catch (err) {
-      // Never leave the user stuck on the camera screen — close it and let
-      // them retry (or fall back to the OS camera) instead.
-      closeCamera();
-      showToast('Gagal mengambil foto, coba lagi ya', 'error');
-    }
+
+    // Show feedback immediately, then let the browser actually paint it
+    // before doing the (synchronous, can take a moment on slower phones)
+    // canvas work — otherwise there's no visual difference between "working"
+    // and "stuck" during that gap.
+    const status = document.getElementById('cam-status');
+    const statusText = document.getElementById('cam-status-text');
+    statusText.textContent = 'Memproses foto…';
+    status.classList.add('show');
+
+    setTimeout(() => {
+      try {
+        const canvas = document.getElementById('camera-canvas');
+        const maxWidth = 700;
+        let w = video.videoWidth || 700, h = video.videoHeight || 700;
+        if (w > maxWidth){ h = h * (maxWidth / w); w = maxWidth; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.45);
+        applyPhoto(key, dataUrl);
+        closeCamera();
+      } catch (err) {
+        // Never leave the user stuck on the camera screen — close it and let
+        // them retry (or fall back to the OS camera) instead.
+        closeCamera();
+        showToast('Gagal mengambil foto, coba lagi ya', 'error');
+      }
+    }, 30);
   }
 
   // ---- toast ----
