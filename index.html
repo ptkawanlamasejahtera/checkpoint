@@ -441,12 +441,13 @@
   const suggestBox = document.getElementById('nopol-suggest');
   const armadaInfoBox = document.getElementById('armada-info');
 
-  function loadMasterArmada(){
+  function loadMasterArmada(attempt){
+    attempt = attempt || 1;
     // Apps Script doesn't send CORS headers, so a plain fetch() GET from a
     // different origin (GitHub Pages) can't read the response — it fails
     // silently and masterArmada stays empty forever. JSONP (loading a
     // <script> tag) isn't subject to CORS, so use that instead.
-    const cbName = 'masterArmadaCb_' + Date.now();
+    const cbName = 'masterArmadaCb_' + Date.now() + '_' + attempt;
     let settled = false;
 
     function cleanup(script){
@@ -458,25 +459,39 @@
       settled = true;
       if (Array.isArray(data)) masterArmada = data;
       cleanup(script);
+      // If the user is mid-typing and the list just arrived, refresh
+      // whatever's currently shown instead of leaving a stale message.
+      if (document.activeElement === nopolInput && nopolInput.value.trim()) {
+        const val = nopolInput.value.trim();
+        const exact = masterArmada.find(m => m.nopol === val);
+        if (exact && !selectedArmada) selectArmada(exact.nopol);
+        else renderSuggestions(val);
+      }
     };
 
     const script = document.createElement('script');
     script.src = scriptUrl + '?action=master&callback=' + cbName;
     script.onerror = () => {
-      if (!settled) { console.warn('Gagal memuat master armada (network)'); cleanup(script); }
+      if (!settled) { cleanup(script); if (attempt < 3) setTimeout(() => loadMasterArmada(attempt + 1), 1200); }
     };
     document.head.appendChild(script);
 
-    // Safety timeout — if the script never loads/calls back, don't leave a
-    // dangling global around forever.
-    setTimeout(() => { if (!settled) cleanup(script); }, 8000);
+    // Mobile networks / a cold Apps Script instance can genuinely take a
+    // while on the first load — give it real time before retrying rather
+    // than giving up in a few seconds.
+    setTimeout(() => {
+      if (!settled) {
+        cleanup(script);
+        if (attempt < 3) loadMasterArmada(attempt + 1);
+      }
+    }, 12000);
   }
   loadMasterArmada();
 
   function renderSuggestions(query){
     if (!query){ suggestBox.classList.remove('show'); return; }
     if (masterArmada.length === 0){
-      suggestBox.innerHTML = '<div class="suggest-empty">Master armada belum termuat — bisa lanjut ketik manual</div>';
+      suggestBox.innerHTML = '<div class="suggest-empty">Master armada belum termuat — <a href="#" onmousedown="event.preventDefault(); retryLoadMaster();">coba lagi</a>, atau lanjut ketik manual</div>';
       suggestBox.classList.add('show');
       return;
     }
@@ -492,6 +507,12 @@
       `).join('');
     }
     suggestBox.classList.add('show');
+  }
+
+  function retryLoadMaster(){
+    showToast('Memuat ulang master armada…', '');
+    loadMasterArmada();
+    setTimeout(() => { if (nopolInput.value.trim()) renderSuggestions(nopolInput.value.trim()); }, 300);
   }
 
   nopolInput.addEventListener('input', function(){
