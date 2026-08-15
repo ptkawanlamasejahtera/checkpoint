@@ -498,7 +498,13 @@
     this.value = this.value.toUpperCase();
     selectedArmada = null;
     armadaInfoBox.style.display = 'none';
-    renderSuggestions(this.value.trim());
+    const val = this.value.trim();
+    const exact = masterArmada.find(m => m.nopol === val);
+    if (exact){
+      selectArmada(exact.nopol);
+      return;
+    }
+    renderSuggestions(val);
   });
   nopolInput.addEventListener('focus', function(){
     if (this.value.trim()) renderSuggestions(this.value.trim());
@@ -506,12 +512,22 @@
   nopolInput.addEventListener('blur', function(){
     setTimeout(() => {
       suggestBox.classList.remove('show');
-      if (this.value.trim() && !selectedArmada){
-        document.getElementById('info-kode').textContent = '-';
-        document.getElementById('info-type').textContent = '-';
-        document.getElementById('info-bu').textContent = '-';
-        armadaInfoBox.style.display = 'block';
+      if (!this.value.trim() || selectedArmada) return;
+
+      // User may have typed the full plate number without tapping the
+      // dropdown suggestion (e.g. typed fast and moved to the next field).
+      // If it exactly matches a master entry, fill it in automatically
+      // instead of requiring an explicit tap.
+      const exact = masterArmada.find(m => m.nopol === this.value.trim());
+      if (exact){
+        selectArmada(exact.nopol);
+        return;
       }
+
+      document.getElementById('info-kode').textContent = '-';
+      document.getElementById('info-type').textContent = '-';
+      document.getElementById('info-bu').textContent = '-';
+      armadaInfoBox.style.display = 'block';
     }, 150);
   });
 
