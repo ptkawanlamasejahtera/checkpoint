@@ -441,6 +441,12 @@
   const suggestBox = document.getElementById('nopol-suggest');
   const armadaInfoBox = document.getElementById('armada-info');
 
+  // Master data is often entered by hand (Excel/Sheets) with inconsistent
+  // spacing — "A8373WX" vs "A 8373 WX" vs a stray trailing space — which
+  // made strict === matching miss real matches unpredictably. Normalize
+  // (uppercase, strip all whitespace) on both sides before comparing.
+  function normalizeNopol(s){ return String(s || '').toUpperCase().replace(/\s+/g, '').trim(); }
+
   function loadMasterArmada(attempt){
     attempt = attempt || 1;
     // Apps Script doesn't send CORS headers, so a plain fetch() GET from a
@@ -463,7 +469,7 @@
       // whatever's currently shown instead of leaving a stale message.
       if (document.activeElement === nopolInput && nopolInput.value.trim()) {
         const val = nopolInput.value.trim();
-        const exact = masterArmada.find(m => m.nopol === val);
+        const exact = masterArmada.find(m => normalizeNopol(m.nopol) === normalizeNopol(val));
         if (exact && !selectedArmada) selectArmada(exact.nopol);
         else renderSuggestions(val);
       }
@@ -495,7 +501,7 @@
       suggestBox.classList.add('show');
       return;
     }
-    const matches = masterArmada.filter(m => m.nopol.includes(query)).slice(0, 6);
+    const matches = masterArmada.filter(m => normalizeNopol(m.nopol).includes(normalizeNopol(query))).slice(0, 6);
     if (matches.length === 0){
       suggestBox.innerHTML = '<div class="suggest-empty">Nopol tidak ada di master — lanjut input manual</div>';
     } else {
@@ -520,7 +526,7 @@
     selectedArmada = null;
     armadaInfoBox.style.display = 'none';
     const val = this.value.trim();
-    const exact = masterArmada.find(m => m.nopol === val);
+    const exact = masterArmada.find(m => normalizeNopol(m.nopol) === normalizeNopol(val));
     if (exact){
       selectArmada(exact.nopol);
       return;
@@ -539,7 +545,7 @@
       // dropdown suggestion (e.g. typed fast and moved to the next field).
       // If it exactly matches a master entry, fill it in automatically
       // instead of requiring an explicit tap.
-      const exact = masterArmada.find(m => m.nopol === this.value.trim());
+      const exact = masterArmada.find(m => normalizeNopol(m.nopol) === normalizeNopol(this.value));
       if (exact){
         selectArmada(exact.nopol);
         return;
