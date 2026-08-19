@@ -402,11 +402,19 @@
 
   <div class="section-title">Rekomendasi</div>
   <div class="card">
-    <div class="field" style="margin-bottom:0;">
+    <div class="field" id="suggest-field" style="margin-bottom:0;">
       <label>Suggest <span class="req">*</span></label>
       <div class="toggle-row">
-        <div class="toggle-btn" id="suggest-cuci" onclick="selectToggle('suggest','cuci')">CUCI</div>
-        <div class="toggle-btn" id="suggest-tidak" onclick="selectToggle('suggest','tidak')">TIDAK CUCI</div>
+        <div class="toggle-btn" id="suggest-cuci" onclick="selectToggle('suggest','cuci'); toggleDokumentasiField();">CUCI</div>
+        <div class="toggle-btn" id="suggest-tidak" onclick="selectToggle('suggest','tidak'); toggleDokumentasiField();">TIDAK CUCI</div>
+      </div>
+    </div>
+    <div class="field" id="dokumentasi-field" style="display:none; margin-top:16px; margin-bottom:0;">
+      <label>Foto Dokumentasi (Tidak Cuci) <span class="req">*</span></label>
+      <div class="photo-box" id="box-dokumentasi" onclick="openCamera('dokumentasi','Foto Dokumentasi')">
+        <div class="placeholder" id="ph-dokumentasi">📷<span>Ambil foto dokumentasi</span></div>
+        <img id="img-dokumentasi" style="display:none">
+        <input type="file" id="file-dokumentasi" accept="image/*" capture="environment" onchange="handlePhoto(this,'dokumentasi')">
       </div>
     </div>
   </div>
@@ -636,6 +644,10 @@
     const activeEl = document.getElementById(idMap[group][value]);
     activeEl.classList.add('active');
     if (value === 'tidak') activeEl.classList.add('neg');
+  }
+
+  function toggleDokumentasiField(){
+    document.getElementById('dokumentasi-field').style.display = state.suggest === 'tidak' ? 'block' : 'none';
   }
 
   // ---- photo capture + compression ----
@@ -886,6 +898,7 @@
     if (!photos.kabin){ showToast('Foto dalam kabin wajib diisi', 'error'); return; }
     if (!photos.boxfoto){ showToast('Foto dalam box wajib diisi', 'error'); return; }
     if (!photos.belakang){ showToast('Foto tampak belakang wajib diisi', 'error'); return; }
+    if (state.suggest === 'tidak' && !photos.dokumentasi){ showToast('Pilih Tidak Cuci wajib disertai foto dokumentasi', 'error'); return; }
 
     const payload = {
       id, tanggal, nopol, km,
@@ -901,7 +914,8 @@
       foto_bbm: photos.bbm,
       foto_kabin: photos.kabin,
       foto_box: photos.boxfoto,
-      foto_belakang: photos.belakang
+      foto_belakang: photos.belakang,
+      foto_dokumentasi: state.suggest === 'tidak' ? photos.dokumentasi : ''
     };
 
     // brief lock just to prevent accidental double-tap, not to wait on network
@@ -988,7 +1002,8 @@
     state.bbm = null; state.kabin = null; state.box = null; state.suggest = null;
     document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active', 'neg'));
 
-    ['km','bbm','kabin','boxfoto','belakang'].forEach(k => {
+    document.getElementById('dokumentasi-field').style.display = 'none';
+    ['km','bbm','kabin','boxfoto','belakang','dokumentasi'].forEach(k => {
       delete photos[k];
       const img = document.getElementById('img-'+k);
       const ph = document.getElementById('ph-'+k);
