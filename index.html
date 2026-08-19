@@ -350,6 +350,56 @@
     </div>
   </div>
 
+  <div class="section-title">Kondisi dalam Kabin</div>
+  <div class="card">
+    <div class="field">
+      <label>Kebersihan Kabin <span class="req">*</span></label>
+      <div class="toggle-row">
+        <div class="toggle-btn" id="kabin-bersih" onclick="selectToggle('kabin','bersih')">BERSIH</div>
+        <div class="toggle-btn" id="kabin-tidak" onclick="selectToggle('kabin','tidak')">TIDAK BERSIH</div>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label>Foto Dalam Kabin <span class="req">*</span></label>
+      <div class="photo-box" id="box-kabin" onclick="openCamera('kabin','Foto Dalam Kabin')">
+        <div class="placeholder" id="ph-kabin">📷<span>Ambil foto dalam kabin</span></div>
+        <img id="img-kabin" style="display:none">
+        <input type="file" id="file-kabin" accept="image/*" capture="environment" onchange="handlePhoto(this,'kabin')">
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Kondisi dalam Box</div>
+  <div class="card">
+    <div class="field">
+      <label>Kebersihan Box <span class="req">*</span></label>
+      <div class="toggle-row">
+        <div class="toggle-btn" id="box-bersih" onclick="selectToggle('box','bersih')">BERSIH</div>
+        <div class="toggle-btn" id="box-tidak" onclick="selectToggle('box','tidak')">TIDAK BERSIH</div>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label>Foto Dalam Box <span class="req">*</span></label>
+      <div class="photo-box" id="box-boxfoto" onclick="openCamera('boxfoto','Foto Dalam Box')">
+        <div class="placeholder" id="ph-boxfoto">📷<span>Ambil foto dalam box</span></div>
+        <img id="img-boxfoto" style="display:none">
+        <input type="file" id="file-boxfoto" accept="image/*" capture="environment" onchange="handlePhoto(this,'boxfoto')">
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Tampak Belakang</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0;">
+      <label>Foto Armada Tampak Belakang <span class="req">*</span></label>
+      <div class="photo-box" id="box-belakang" onclick="openCamera('belakang','Foto Armada Tampak Belakang')">
+        <div class="placeholder" id="ph-belakang">📷<span>Ambil foto tampak belakang</span></div>
+        <img id="img-belakang" style="display:none">
+        <input type="file" id="file-belakang" accept="image/*" capture="environment" onchange="handlePhoto(this,'belakang')">
+      </div>
+    </div>
+  </div>
+
   <div class="section-title">Rekomendasi</div>
   <div class="card">
     <div class="field" style="margin-bottom:0;">
@@ -571,7 +621,7 @@
   }
 
   // ---- toggles ----
-  const state = { bbm:null, suggest:null };
+  const state = { bbm:null, kabin:null, box:null, suggest:null };
   function selectToggle(group, value){
     state[group] = value;
     document.querySelectorAll(`.toggle-btn`).forEach(b=>{
@@ -579,6 +629,8 @@
     });
     const idMap = {
       bbm:{full:'bbm-full', tidak:'bbm-tidak'},
+      kabin:{bersih:'kabin-bersih', tidak:'kabin-tidak'},
+      box:{bersih:'box-bersih', tidak:'box-tidak'},
       suggest:{cuci:'suggest-cuci', tidak:'suggest-tidak'}
     };
     const activeEl = document.getElementById(idMap[group][value]);
@@ -826,9 +878,14 @@
       showToast('Lengkapi Tanggal & Nopol dulu ya', 'error'); return;
     }
     if (!state.bbm){ showToast('Pilih status BBM dulu', 'error'); return; }
+    if (!state.kabin){ showToast('Pilih kondisi kabin dulu', 'error'); return; }
+    if (!state.box){ showToast('Pilih kondisi box dulu', 'error'); return; }
     if (!state.suggest){ showToast('Pilih rekomendasi Suggest dulu', 'error'); return; }
     if (!photos.km){ showToast('Foto KM wajib diisi', 'error'); return; }
     if (!photos.bbm){ showToast('Foto BBM wajib diisi', 'error'); return; }
+    if (!photos.kabin){ showToast('Foto dalam kabin wajib diisi', 'error'); return; }
+    if (!photos.boxfoto){ showToast('Foto dalam box wajib diisi', 'error'); return; }
+    if (!photos.belakang){ showToast('Foto tampak belakang wajib diisi', 'error'); return; }
 
     const payload = {
       id, tanggal, nopol, km,
@@ -836,10 +893,15 @@
       type_armada: selectedArmada ? selectedArmada.type : '-',
       bu: selectedArmada ? selectedArmada.bu : '-',
       bbm: state.bbm === 'full' ? 'FULL' : 'TIDAK FULL',
+      kabin: state.kabin === 'bersih' ? 'BERSIH' : 'TIDAK BERSIH',
+      box_kondisi: state.box === 'bersih' ? 'BERSIH' : 'TIDAK BERSIH',
       suggest: state.suggest === 'cuci' ? 'CUCI' : 'TIDAK CUCI',
       start, finish, keterangan,
       foto_km: photos.km,
-      foto_bbm: photos.bbm
+      foto_bbm: photos.bbm,
+      foto_kabin: photos.kabin,
+      foto_box: photos.boxfoto,
+      foto_belakang: photos.belakang
     };
 
     // brief lock just to prevent accidental double-tap, not to wait on network
@@ -923,10 +985,10 @@
     document.getElementById('armada-info').style.display = 'none';
     document.getElementById('nopol-suggest').classList.remove('show');
 
-    state.bbm = null; state.suggest = null;
+    state.bbm = null; state.kabin = null; state.box = null; state.suggest = null;
     document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active', 'neg'));
 
-    ['km','bbm'].forEach(k => {
+    ['km','bbm','kabin','boxfoto','belakang'].forEach(k => {
       delete photos[k];
       const img = document.getElementById('img-'+k);
       const ph = document.getElementById('ph-'+k);
